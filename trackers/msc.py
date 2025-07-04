@@ -14,7 +14,7 @@ def track(container_number: str, bl_number: str = None):
 
         soup = BeautifulSoup(response.text, "lxml")
 
-        rows = soup.find_all("div", class_="event-tracking__event")  # struktur dəyişsə yenilənməlidir
+        rows = soup.find_all("div", class_="event-tracking__event")
         if not rows:
             return {"error": "Heç bir izləmə məlumatı tapılmadı."}
 
@@ -27,7 +27,6 @@ def track(container_number: str, bl_number: str = None):
         for row in rows:
             text = row.get_text(separator="|", strip=True).lower()
 
-            # Extract date from start
             date_raw = row.find("div", class_="event-tracking__date")
             date_str = date_raw.text.strip() if date_raw else ""
             try:
@@ -48,12 +47,15 @@ def track(container_number: str, bl_number: str = None):
                 eta_pod = formatted_date
 
         return {
-            "etd_from_pol": etd_from_pol or "not found",
-            "eta_transshipment": eta_trans or "not found",
-            "etd_transshipment": etd_trans or "not found",
-            "feeder_name": feeder_name or "",
+            "etd_pol": etd_from_pol or "not found",
+            "eta_transit": eta_trans or "not found",
+            "etd_transit": etd_trans or "not found",
+            "feeder": feeder_name or "",
             "eta_pod": eta_pod or "not found"
         }
 
     except Exception as e:
         return {"error": f"Xəta baş verdi: {str(e)}"}
+
+def track_msc(bl_number, container_number):
+    return track(container_number, bl_number)
