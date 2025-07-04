@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import asyncio
 import nest_asyncio
-from trackers import msc_scrape
+from trackers import msc_api  # ✅ msc_scrape yox, artıq msc_api
 
 nest_asyncio.apply()
 app = Flask(__name__)
@@ -29,7 +29,7 @@ def track():
 
         if shipping_line == "msc":
             loop = asyncio.get_event_loop()
-            msc_data = loop.run_until_complete(msc_scrape.track_msc(bl_number))
+            msc_data = loop.run_until_complete(msc_api.track_msc(bl_number))  # ✅ dəyişdirildi
             if msc_data.get("success"):
                 result.update({
                     "etd_pol": msc_data.get("etd_pol", ""),
