@@ -1,64 +1,65 @@
 import requests
-from bs4 import BeautifulSoup
-from datetime import datetime
 
 def track(container_number: str, bl_number: str = None):
     try:
-        print(f"İzləmə üçün göndərildi: container={container_number}, bl={bl_number}")
-        url = f"https://www.msc.com/en/track-a-shipment?tracking_number={container_number}"
+        # Hansı nömrə varsa onu istifadə edirik
+        tracking_number = bl_number or container_number
+        if not tracking_number:
+            return {"error": "Neither container number nor BL number provided."}
+
+        url = "https://www.msc.com/api/feature/tools/TrackingInfo"
         headers = {
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "Origin": "https://www.msc.com",
+            "Referer": "https://www.msc.com/en/track-a-shipment"
         }
-        response = requests.get(url, headers=headers)
+
+        payload = {
+            "TrackingNumber": tracking_number,
+            "SearchBy": "B" if bl_number else "C"  # BL varsa B, yoxdursa konteyner üçün C
+        }
+
+        response = requests.post(url, headers=headers, json=payload)
         if response.status_code != 200:
-            return {"error": "MSC saytı cavab vermədi."}
+            return {"error": "MSC API cavab vermədi."}
 
-        print("Page text preview:", response.text[:500])  # ilk 500 simvolu göstər
+        data = response.json()
 
-        soup = BeautifulSoup(response.text, "lxml")
-
-        rows = soup.find_all("div", class_="event-tracking__event")
-        print("Saytdan alınan event sayı:", len(rows))
-
-        if not rows:
-            print("Heç bir izləmə hadisəsi tapılmadı.")
-            return {"error": "Heç bir izləmə məlumatı tapılmadı."}
+        # Əsas izləmə eventləri
+        events = data.get("TrackingEvents", [])
+        raw_result = events  # Sonra təhlil üçün bütün məlumatları saxlayırıq
 
         etd_from_pol = None
-        eta_trans = None
-        etd_trans = None
+        eta_transshipment = None
+        etd_transshipment = None
         feeder_name = None
         eta_pod = None
 
-        for row in rows:
-            text = row.get_text(separator="|", strip=True).lower()
+        for event in events:
+            desc = event.get("EventDescription", "").lower()
+            date = event.get("EventDate", "")[:10]  # format: YYYY-MM-DD
+            vessel = event.get("VesselName", "")
+            location = event.get("LocationName", "")
 
-            # Extract date from start
-            date_raw = row.find("div", class_="event-tracking__date")
-            date_str = date_raw.text.strip() if date_raw else ""
-            try:
-                date_obj = datetime.strptime(date_str, "%d/%m/%Y")
-                formatted_date = date_obj.strftime("%d.%m.%Y")
-            except:
-                continue
-
-            if "export loaded on vessel" in text and not etd_from_pol:
-                etd_from_pol = formatted_date
-            elif "transshipment discharged" in text and not eta_trans:
-                eta_trans = formatted_date
-            elif "transshipment loaded" in text and not etd_trans:
-                etd_trans = formatted_date
-                feeder = row.find("div", class_="event-tracking__vessel")
-                feeder_name = feeder.text.strip() if feeder else None
-            elif "import discharged from vessel" in text and not eta_pod:
-                eta_pod = formatted_date
+            if "export loaded" in desc and not etd_from_pol:
+                etd_from_pol = date
+            elif "transshipment discharged" in desc and not eta_transshipment:
+                eta_transshipment = date
+            elif "transshipment loaded" in desc and not etd_transshipment:
+                etd_transshipment = date
+                feeder_name = vessel
+            elif "import discharged" in desc and not eta_pod:
+                eta_pod = date
 
         return {
-            "etd_pol": etd_from_pol or "not found",
-            "eta_transit": eta_trans or "not found",
-            "etd_transit": etd_trans or "not found",
-            "feeder_name": feeder_name or "",
-            "eta_pod": eta_pod or "not found"
+            "etd_pol": etd_from_pol,
+            "eta_transit": eta_transshipment,
+            "etd_transit": etd_transshipment,
+            "feeder": feeder_name,
+            "eta_pod": eta_pod,
+            "raw_result": raw_result
         }
 
     except Exception as e:
