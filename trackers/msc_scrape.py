@@ -1,57 +1,67 @@
-import asyncio
-from playwright.async_api import async_playwright
-from datetime import datetime
-from bs4 import BeautifulSoup
+import aiohttp
+import json
 
 async def track_msc(bl_number):
     try:
-        async with async_playwright() as playwright:
-            chrome_path = "/opt/render/.cache/ms-playwright/chromium-1179/chrome-linux/chrome"
-            browser = await playwright.chromium.launch(executable_path=chrome_path, headless=True)
-            page = await browser.new_page()
+        url = "https://www.msc.com/api/feature/tools/TrackingInfo"
+        headers = {
+            "Content-Type": "application/json",
+            "Origin": "https://www.msc.com",
+            "Referer": "https://www.msc.com/en/tools/track-a-shipment",
+            "User-Agent": "Mozilla/5.0"
+        }
+        payload = {
+            "containerNumber": None,
+            "isLiveTracking": False,
+            "searchBy": "B",
+            "searchNumber": bl_number
+        }
 
-            await page.goto("https://www.msc.com/en/tools/track-a-shipment")
-            await page.fill('input[name="reference"]', bl_number)
-            await page.click('button[type="submit"]')
-            await page.wait_for_timeout(6000)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as response:
+                if response.status != 200:
+                    return {"success": False, "error": f"HTTP {response.status} error"}
 
-            html = await page.content()
-            await browser.close()
+                data = await response.json()
 
-            # ✅ HTML parse et
-            soup = BeautifulSoup(html, "lxml")
+                if not data.get("shipments"):
+                    return {"success": False, "error": "No shipment found"}
 
-            def get_event(text):
-                el = soup.find("div", string=lambda t: t and text.lower() in t.lower())
-                if el:
-                    parent = el.find_parent("div", class_="shipment-event") or el.parent
-                    date_el = parent.find("div", class_="date")
-                    port_el = parent.find("div", class_="port")
-                    vessel_el = parent.find("div", class_="vessel")
-                    return {
-                        "date": date_el.text.strip() if date_el else "",
-                        "port": port_el.text.strip() if port_el else "",
-                        "vessel": vessel_el.text.strip() if vessel_el else ""
-                    }
-                return {}
+                shipment = data["shipments"][0]
+                events = shipment.get("events", [])
 
-            # Bu hissədə uyğunlaşdırma edə bilərik
-            etd_pol = get_event("Export Loaded")
-            trans = get_event("Transshipment")
-            discharged = get_event("Discharged from Vessel")
+                # Boş dəyişənlər
+                etd_pol = ""
+                eta_trans = ""
+                etd_trans = ""
+                eta_pod = ""
+                feeder = ""
 
-            return {
-                "success": True,
-                "etd_pol": etd_pol.get("date", ""),
-                "eta_transshipment": trans.get("date", ""),
-                "etd_transshipment": trans.get("date", ""),
-                "feeder": trans.get("vessel", ""),
-                "eta_pod": discharged.get("date", "")
-            }
+                for event in events:
+                    event_type = event.get("eventType", "").lower()
+                    event_date = event.get("eventDate", "")
+                    vessel = event.get("vesselName", "")
+
+                    if "export loaded" in event_type and not etd_pol:
+                        etd_pol = event_date
+                    elif "transshipment" in event_type:
+                        if not eta_trans:
+                            eta_trans = event_date
+                        if not etd_trans:
+                            etd_trans = event_date
+                        if vessel and not feeder:
+                            feeder = vessel
+                    elif "discharged from vessel" in event_type and not eta_pod:
+                        eta_pod = event_date
+
+                return {
+                    "success": True,
+                    "etd_pol": etd_pol,
+                    "eta_transshipment": eta_trans,
+                    "etd_transshipment": etd_trans,
+                    "feeder": feeder,
+                    "eta_pod": eta_pod
+                }
 
     except Exception as e:
-        print("🔥 MSC scraping error:", str(e))  # bunu əlavə et
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}
