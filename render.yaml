@@ -3,6 +3,5 @@ services:
     name: container-tracker
     env: docker
     plan: free
-    region: frankfurt
-    buildCommand: pip install -r requirements.txt && playwright install chromium
-    startCommand: gunicorn app:app --bind 0.0.0.0:10000
+    dockerfilePath: Dockerfile
+    autoDeploy: true
