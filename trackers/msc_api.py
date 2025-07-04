@@ -1,46 +1,26 @@
-import aiohttp
-import json
+from playwright.async_api import async_playwright
 
 async def track_msc(bl_number):
     try:
-        url = "https://www.msc.com/api/feature/tools/TrackingInfo"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Content-Type": "application/json",
-            "Origin": "https://www.msc.com",
-            "Referer": "https://www.msc.com/",
-        }
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page = await context.new_page()
 
-        payload = {
-            "SearchBy": "BOL",
-            "Number": bl_number
-        }
+            await page.goto("https://www.msc.com/track-a-shipment", timeout=60000)
+            await page.get_by_role("textbox").fill(bl_number)
+            await page.get_by_role("button", name="Track").click()
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload) as resp:
-                if resp.status != 200:
-                    return {"success": False, "error": f"HTTP {resp.status} error"}
-                
-                data = await resp.json()
+            await page.wait_for_selector(".shipment-container", timeout=20000)
 
-                containers = data.get("Containers", [])
-                if not containers:
-                    return {"success": False, "error": "No container data found."}
+            # Məlumatı parslamaq üçün HTML götür (bu sadə testdir, real datanı parse edə bilərik)
+            content = await page.content()
+            await browser.close()
 
-                events = containers[0].get("Events", [])
-
-                etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
-                eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
-                feeder = next((e["VesselName"] for e in events if e.get("VesselName")), "")
-
-                return {
-                    "success": True,
-                    "etd_pol": etd_pol,
-                    "eta_pod": eta_pod,
-                    "feeder": feeder,
-                    "eta_transshipment": "",
-                    "etd_transshipment": ""
-                }
+            return {
+                "success": True,
+                "html": content[:1000]
+            }
 
     except Exception as e:
         return {"success": False, "error": str(e)}
