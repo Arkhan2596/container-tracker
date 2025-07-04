@@ -50,6 +50,7 @@ async def track_msc(bl_number):
             }
 
     except Exception as e:
+        print("🔥 MSC scraping error:", str(e))  # bunu əlavə et
         return {
             "success": False,
             "error": str(e)
