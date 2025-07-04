@@ -1,7 +1,4 @@
 flask
-requests
-beautifulsoup4
-lxml
 gunicorn
-nest_asyncio
 aiohttp
+nest_asyncio
