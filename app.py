@@ -15,6 +15,8 @@ def track():
         container_number = data.get('container_number', '').strip()
         shipping_line = data.get('shipping_line', '').lower().strip()
 
+        print("📦 Received data:", data)  # Əlavə et
+
         result = {
             "etd_pol": "No result found",
             "eta_transshipment": "No result found",
@@ -25,17 +27,19 @@ def track():
         }
 
         if shipping_line == "msc":
-            msc_result = msc_scrape.track_msc(container_number, bl_number)  # Scraper funksiyası
-            print("MSC result:", msc_result)
+            from trackers import msc_scrape
+            msc_result = msc_scrape.track_msc(bl_number)
 
-            for key in result:
-                if key in msc_result and msc_result[key]:
-                    result[key] = msc_result[key]
+            print("🔧 MSC scrape result:", msc_result)  # Əlavə et
+
+            result["raw_result"] = msc_result
 
         return jsonify(result)
 
     except Exception as e:
+        print("🔥 General error:", str(e))  # Əlavə et
         return jsonify({"error": str(e)})
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=10000)
