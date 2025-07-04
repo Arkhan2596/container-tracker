@@ -1,12 +1,12 @@
 import requests
 
 def track(container_number, bl_number):
-    url = "https://www.msc.com/api/feature/tools/TrackingInfo"
     session = requests.Session()
 
-    # 1. Get homepage to get cookies
+    # Step 1: Get cookies by loading track page
     session.get("https://www.msc.com/en/track-a-shipment")
 
+    # Step 2: Prepare headers like a browser
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*",
@@ -22,16 +22,20 @@ def track(container_number, bl_number):
     }
 
     try:
-        response = session.post(url, json=payload, headers=headers, timeout=20)
+        response = session.post(
+            "https://www.msc.com/api/feature/tools/TrackingInfo",
+            json=payload,
+            headers=headers,
+            timeout=15
+        )
+
+        print("MSC response status:", response.status_code)
+        print("MSC response body:", response.text)
 
         if response.status_code != 200:
-            return {
-                "error": f"MSC API status code: {response.status_code}",
-                "payload": payload
-            }
+            return {"error": f"MSC API status code: {response.status_code}", "payload": payload}
 
         data = response.json()
-
         if not data.get("Shipments"):
             return {"error": "MSC: Heç bir shipment tapılmadı."}
 
@@ -53,18 +57,15 @@ def track(container_number, bl_number):
 
             if "export loaded" in name and not result["etd_pol"]:
                 result["etd_pol"] = date
-
             elif "transshipment discharged" in name and not result["eta_transshipment"]:
                 result["eta_transshipment"] = date
-
             elif "transshipment loaded" in name and not result["etd_transshipment"]:
                 result["etd_transshipment"] = date
                 result["feeder"] = vessel
-
             elif "discharged from vessel" in name and not result["eta_pod"]:
                 result["eta_pod"] = date
 
         return result
 
     except Exception as e:
-        return {"error": f"MSC istisna: {str(e)}"}
+        return {"error": f"MSC Exception: {str(e)}", "payload": payload}
