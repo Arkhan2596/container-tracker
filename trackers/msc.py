@@ -24,12 +24,13 @@ def track(container_number, bl_number):
 
         shipment = data["Shipments"][0]
         events = shipment.get("Events", [])
+
         result = {
-            "ETD from POL": "",
-            "ETA Transshipment port": "",
-            "ETD Transshipment port": "",
-            "Feeder name": "",
-            "ETA Vessel at POD": "",
+            "etd_pol": "",
+            "eta_transshipment": "",
+            "etd_transshipment": "",
+            "feeder": "",
+            "eta_pod": "",
             "raw_result": data
         }
 
@@ -38,15 +39,15 @@ def track(container_number, bl_number):
             location = event.get("Location", {}).get("DisplayName", "")
             event_date = event.get("ActualDate", "") or event.get("EstimatedDate", "")
 
-            if "loaded" in event_name and not result["ETD from POL"]:
-                result["ETD from POL"] = event_date
+            if "loaded" in event_name and not result["etd_pol"]:
+                result["etd_pol"] = event_date
             elif "transshipment" in event_name:
                 if "eta" in event_name:
-                    result["ETA Transshipment port"] = event_date
+                    result["eta_transshipment"] = event_date
                 elif "etd" in event_name:
-                    result["ETD Transshipment port"] = event_date
-            elif "discharged" in event_name and not result["ETA Vessel at POD"]:
-                result["ETA Vessel at POD"] = event_date
+                    result["etd_transshipment"] = event_date
+            elif "discharged" in event_name and not result["eta_pod"]:
+                result["eta_pod"] = event_date
 
         return result
 
