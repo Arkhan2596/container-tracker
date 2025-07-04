@@ -2,9 +2,8 @@ services:
   - type: web
     name: container-tracker
     env: python
-    plan: free
-    buildCommand: bash build.sh
-    startCommand: ""
+    buildCommand: ./build.sh
+    startCommand: gunicorn app:app --bind 0.0.0.0:10000
     envVars:
       - key: PYTHON_VERSION
         value: 3.10
