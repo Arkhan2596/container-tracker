@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from trackers import msc
+from trackers import msc  # <- Yəni, msc.py faylı `trackers` qovluğundadır
 
 app = Flask(__name__)
 
@@ -26,14 +26,9 @@ def track():
 
         if shipping_line == "msc":
             msc_result = msc.track(container_number, bl_number)
-            result.update({
-                "etd_pol": msc_result.get("ETD from POL") or "No result found",
-                "eta_transshipment": msc_result.get("ETA Transshipment port") or "No result found",
-                "etd_transshipment": msc_result.get("ETD Transshipment port") or "No result found",
-                "feeder": msc_result.get("Feeder name") or "No result found",
-                "eta_pod": msc_result.get("ETA Vessel at POD") or "No result found",
-                "raw_result": msc_result.get("raw_result") or {}
-            })
+            for key in result:
+                if key in msc_result and msc_result[key]:
+                    result[key] = msc_result[key]
 
         return jsonify(result)
 
