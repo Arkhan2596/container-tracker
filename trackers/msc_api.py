@@ -5,62 +5,43 @@ async def track_msc(bl_number):
     try:
         url = "https://www.msc.com/api/feature/tools/TrackingInfo"
         headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
             "Content-Type": "application/json",
             "Origin": "https://www.msc.com",
-            "Referer": "https://www.msc.com/en/tools/track-a-shipment",
-            "User-Agent": "Mozilla/5.0"
+            "Referer": "https://www.msc.com/",
         }
+
         payload = {
-            "containerNumber": None,
-            "isLiveTracking": False,
-            "searchBy": "B",
-            "searchNumber": bl_number
+            "SearchBy": "BOL",
+            "Number": bl_number
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload) as response:
-                if response.status != 200:
-                    return {"success": False, "error": f"HTTP {response.status} error"}
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status != 200:
+                    return {"success": False, "error": f"HTTP {resp.status} error"}
+                
+                data = await resp.json()
 
-                data = await response.json()
+                # sənədləri burdan çıxart
+                containers = data.get("Containers", [])
+                if not containers:
+                    return {"success": False, "error": "No container data found."}
 
-                if not data.get("shipments"):
-                    return {"success": False, "error": "No shipment found"}
+                events = containers[0].get("Events", [])
 
-                shipment = data["shipments"][0]
-                events = shipment.get("events", [])
-
-                # Boş dəyişənlər
-                etd_pol = ""
-                eta_trans = ""
-                etd_trans = ""
-                eta_pod = ""
-                feeder = ""
-
-                for event in events:
-                    event_type = event.get("eventType", "").lower()
-                    event_date = event.get("eventDate", "")
-                    vessel = event.get("vesselName", "")
-
-                    if "export loaded" in event_type and not etd_pol:
-                        etd_pol = event_date
-                    elif "transshipment" in event_type:
-                        if not eta_trans:
-                            eta_trans = event_date
-                        if not etd_trans:
-                            etd_trans = event_date
-                        if vessel and not feeder:
-                            feeder = vessel
-                    elif "discharged from vessel" in event_type and not eta_pod:
-                        eta_pod = event_date
+                # AYRILMIŞ məlumat çıxarış — nümunə üçün
+                etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
+                eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
+                feeder = next((e["VesselName"] for e in events if e.get("VesselName")), "")
 
                 return {
                     "success": True,
                     "etd_pol": etd_pol,
-                    "eta_transshipment": eta_trans,
-                    "etd_transshipment": etd_trans,
+                    "eta_pod": eta_pod,
                     "feeder": feeder,
-                    "eta_pod": eta_pod
+                    "eta_transshipment": "",  # Əgər varsa çıxara bilərsən
+                    "etd_transshipment": ""
                 }
 
     except Exception as e:
