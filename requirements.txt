@@ -4,4 +4,4 @@ beautifulsoup4
 lxml
 gunicorn
 nest_asyncio
-playwright
+aiohttp
