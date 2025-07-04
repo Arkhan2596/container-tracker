@@ -2,14 +2,15 @@ import requests
 
 def track(container_number, bl_number):
     url = "https://www.msc.com/api/feature/tools/TrackingInfo"
+
     headers = {
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
         "Content-Type": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
         "Origin": "https://www.msc.com",
         "Referer": "https://www.msc.com/en/track-a-shipment",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "X-Requested-With": "XMLHttpRequest"
+        "X-Requested-With": "XMLHttpRequest",
+        "Cookie": "msccargo#lang=en; currentLocation=GE; shell#lang=en"  # Sadələşdirilmiş cookie
     }
 
     payload = {
@@ -18,7 +19,7 @@ def track(container_number, bl_number):
     }
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=20)
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
 
         if response.status_code != 200:
             return {
@@ -27,8 +28,9 @@ def track(container_number, bl_number):
             }
 
         data = response.json()
+
         if not data.get("Shipments"):
-            return {"error": "MSC: Heç bir shipment tapılmadı.", "payload": payload}
+            return {"error": "MSC: Heç bir shipment tapılmadı."}
 
         shipment = data["Shipments"][0]
         events = shipment.get("Events", [])
@@ -42,22 +44,25 @@ def track(container_number, bl_number):
         }
 
         for event in events:
-            event_name = event.get("EventName", "").lower()
+            name = event.get("EventName", "").lower()
+            date = event.get("ActualDate", "") or event.get("EstimatedDate", "")
             location = event.get("Location", {}).get("DisplayName", "")
-            event_date = event.get("ActualDate", "") or event.get("EstimatedDate", "")
-            vessel = event.get("VesselName", "") or ""
+            vessel = event.get("VesselName", "")
 
-            if "export loaded" in event_name and not result["etd_pol"]:
-                result["etd_pol"] = event_date
-            elif "transshipment discharged" in event_name:
-                result["eta_transshipment"] = event_date
-            elif "transshipment loaded" in event_name:
-                result["etd_transshipment"] = event_date
-            elif "discharged from vessel" in event_name:
-                result["eta_pod"] = event_date
+            if "export loaded" in name and not result["etd_pol"]:
+                result["etd_pol"] = date
+
+            elif "transshipment discharged" in name and not result["eta_transshipment"]:
+                result["eta_transshipment"] = date
+
+            elif "transshipment loaded" in name and not result["etd_transshipment"]:
+                result["etd_transshipment"] = date
                 result["feeder"] = vessel
+
+            elif "discharged from vessel" in name and not result["eta_pod"]:
+                result["eta_pod"] = date
 
         return result
 
     except Exception as e:
-        return {"error": f"MSC API exception: {str(e)}", "payload": payload}
+        return {"error": f"MSC istisna: {str(e)}"}
