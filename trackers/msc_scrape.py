@@ -1,30 +1,43 @@
-from playwright.sync_api import sync_playwright
+import asyncio
+from playwright.async_api import async_playwright
+from datetime import datetime
+import json
 
-def track_msc(bl_number):
+async def track_msc(bl_number):
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto("https://www.msc.com/en/track-a-shipment")
+        async with async_playwright() as playwright:
+            # ✅ Render-də yüklənmiş brauzerin tam yolu
+            chrome_path = "/opt/render/.cache/ms-playwright/chromium-1179/chrome-linux/chrome"
+            
+            browser = await playwright.chromium.launch(executable_path=chrome_path, headless=True)
+            page = await browser.new_page()
 
-            page.fill('input[name="SearchValue"]', bl_number)
-            page.click('button:has-text("Track")')
+            # MSC tracking səhifəsinə POST vasitəsilə keçid (əgər API varsa, onu istifadə et)
+            await page.goto("https://www.msc.com/en/tools/track-a-shipment")
 
-            page.wait_for_selector('.shipment-events', timeout=15000)
-            html_content = page.inner_html('.shipment-events')
+            await page.fill('input[name="reference"]', bl_number)
+            await page.click('button[type="submit"]')
+            await page.wait_for_timeout(6000)
 
-            print("🔍 HTML content from MSC:")
-            print(html_content)
+            content = await page.content()
+            await browser.close()
 
-            browser.close()
+            # Parse ediləcək hissəni burada əlavə edirsən:
+            # events = parse_events(content)  # öz parse funksiyanı çağır
             return {
                 "success": True,
-                "html": html_content
+                "raw_html": content,
+                # "parsed_events": events
             }
 
     except Exception as e:
-        print("❌ MSC scraping failed:", str(e))  # <-- Əlavə et
         return {
             "success": False,
             "error": str(e)
         }
+
+# Test üçün (lokalda işlədilirsə)
+if __name__ == "__main__":
+    bl = "MEDUJB511593"
+    result = asyncio.run(track_msc(bl))
+    print(json.dumps(result, indent=2))
