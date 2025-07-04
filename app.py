@@ -1,5 +1,10 @@
 from flask import Flask, request, jsonify
-from trackers import msc_scrape  # <- Yeni scraping faylı
+import asyncio
+import nest_asyncio
+from trackers import msc_scrape  # msc_scrape.track_msc async funksiyadır
+
+# Nest asyncio event loop problemi üçün
+nest_asyncio.apply()
 
 app = Flask(__name__)
 
@@ -15,7 +20,7 @@ def track():
         container_number = data.get('container_number', '').strip()
         shipping_line = data.get('shipping_line', '').lower().strip()
 
-        print("📦 Received data:", data)  # Əlavə et
+        print("📦 Received data:", data)
 
         result = {
             "etd_pol": "No result found",
@@ -27,17 +32,17 @@ def track():
         }
 
         if shipping_line == "msc":
-            from trackers import msc_scrape
-            msc_result = msc_scrape.track_msc(bl_number)
-
-            print("🔧 MSC scrape result:", msc_result)  # Əlavə et
-
+            # async function icra edilir
+            msc_result = asyncio.get_event_loop().run_until_complete(
+                msc_scrape.track_msc(bl_number)
+            )
+            print("🔧 MSC scrape result:", msc_result)
             result["raw_result"] = msc_result
 
         return jsonify(result)
 
     except Exception as e:
-        print("🔥 General error:", str(e))  # Əlavə et
+        print("🔥 General error:", str(e))
         return jsonify({"error": str(e)})
 
 
