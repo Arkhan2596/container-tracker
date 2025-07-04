@@ -6,26 +6,20 @@ app = Flask(__name__)
 
 @app.route("/track", methods=["POST"])
 def track():
-    data = request.json
-    container_number = clean_input(data.get("container_number", ""))
-    bl_number = clean_input(data.get("bl_number", ""))
-    shipping_line = clean_input(data.get("shipping_line", "")).lower()
+    data = request.get_json()
+    container_number = data.get("container_number", "")
+    bl_number = data.get("bl_number", "")
+    shipping_line = data.get("shipping_line", "").lower()
 
-    result = {
-        "etd_pol": "",
-        "eta_transit": "",
-        "etd_transit": "",
-        "feeder": "",
-        "eta_pod": "",
-        "status": "No result found"
-    }
+    if shipping_line == "msc":
+        result = msc.track(container_number, bl_number)
+        return jsonify({
+            "raw_result": result,  # bunu əlavə etdik
+            "etd_pol": result.get("etd_from_pol", ""),
+            "eta_transit": result.get("eta_transshipment", ""),
+            "etd_transit": result.get("etd_transshipment", ""),
+            "feeder": result.get("feeder_name", ""),
+            "eta_pod": result.get("eta_pod", "")
+        })
 
-    try:
-        if shipping_line == "msc":
-            result = msc.track_msc(container_number, bl_number)
-            print("MSC nəticəsi:", result)      
-
-    except Exception as e:
-        result["status"] = f"Error: {str(e)}"
-
-    return jsonify(result)
+    return jsonify({"error": "Unsupported shipping line."})
