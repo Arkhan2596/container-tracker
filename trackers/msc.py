@@ -15,6 +15,7 @@ def track(container_number: str, bl_number: str = None):
         soup = BeautifulSoup(response.text, "lxml")
 
         rows = soup.find_all("div", class_="event-tracking__event")
+        print("Saytdan alınan event sayı:", len(rows))
         if not rows:
             return {"error": "Heç bir izləmə məlumatı tapılmadı."}
 
