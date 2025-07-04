@@ -2,6 +2,10 @@ import requests
 
 def track(container_number, bl_number):
     url = "https://www.msc.com/api/feature/tools/TrackingInfo"
+    session = requests.Session()
+
+    # 1. Get homepage to get cookies
+    session.get("https://www.msc.com/en/track-a-shipment")
 
     headers = {
         "Content-Type": "application/json",
@@ -9,8 +13,7 @@ def track(container_number, bl_number):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
         "Origin": "https://www.msc.com",
         "Referer": "https://www.msc.com/en/track-a-shipment",
-        "X-Requested-With": "XMLHttpRequest",
-        "Cookie": "msccargo#lang=en; currentLocation=GE; shell#lang=en"  # Sadələşdirilmiş cookie
+        "X-Requested-With": "XMLHttpRequest"
     }
 
     payload = {
@@ -19,7 +22,7 @@ def track(container_number, bl_number):
     }
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        response = session.post(url, json=payload, headers=headers, timeout=20)
 
         if response.status_code != 200:
             return {
@@ -46,7 +49,6 @@ def track(container_number, bl_number):
         for event in events:
             name = event.get("EventName", "").lower()
             date = event.get("ActualDate", "") or event.get("EstimatedDate", "")
-            location = event.get("Location", {}).get("DisplayName", "")
             vessel = event.get("VesselName", "")
 
             if "export loaded" in name and not result["etd_pol"]:
