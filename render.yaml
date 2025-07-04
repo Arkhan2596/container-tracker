@@ -3,5 +3,8 @@ services:
     name: container-tracker
     env: docker
     plan: free
-    autoDeploy: true
-    region: frankfurt
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 10000
