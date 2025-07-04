@@ -2,3 +2,4 @@ flask
 gunicorn
 aiohttp
 nest_asyncio
+playwright
