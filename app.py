@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify
-from trackers import msc  # msc.py faylı `trackers/` qovluğundadır
+from trackers import msc_scrape  # <- Yeni scraping faylı
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return 'MSC Container Tracking API is running.'
+    return 'MSC Container Tracking API (Scraping-based) is running.'
 
 @app.route('/track', methods=['POST'])
 def track():
@@ -25,9 +25,7 @@ def track():
         }
 
         if shipping_line == "msc":
-            msc_result = msc.track(container_number, bl_number)
-
-            # 🔍 Debug üçün nəticəni loga ver:
+            msc_result = msc_scrape.track_msc(container_number, bl_number)  # Scraper funksiyası
             print("MSC result:", msc_result)
 
             for key in result:
