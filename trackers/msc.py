@@ -5,7 +5,7 @@ def track(container_number, bl_number):
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "User-Agent": "Mozilla/5.0",
         "Origin": "https://www.msc.com",
         "Referer": "https://www.msc.com/en/track-a-shipment",
         "X-Requested-With": "XMLHttpRequest"
@@ -35,29 +35,23 @@ def track(container_number, bl_number):
         }
 
         for event in events:
-            name = event.get("EventName", "").lower()
+            event_name = event.get("EventName", "")
             date = event.get("ActualDate", "") or event.get("EstimatedDate", "")
-            location = event.get("Location", {}).get("DisplayName", "")
             vessel = event.get("VesselName", "")
 
-            # ETD from POL
-            if "export loaded" in name and not result["ETD from POL"]:
+            if event_name == "Export Loaded on Vessel" and not result["ETD from POL"]:
                 result["ETD from POL"] = date
 
-            # ETA Transshipment
-            elif "transshipment discharged" in name and not result["ETA Transshipment port"]:
+            elif event_name == "Full Transshipment Discharged" and not result["ETA Transshipment port"]:
                 result["ETA Transshipment port"] = date
 
-            # ETD Transshipment
-            elif "transshipment loaded" in name and not result["ETD Transshipment port"]:
+            elif event_name == "Full Transshipment Loaded" and not result["ETD Transshipment port"]:
                 result["ETD Transshipment port"] = date
 
-            # ETA at POD
-            elif "import discharged" in name and not result["ETA Vessel at POD"]:
+            elif event_name == "Import Discharged from Vessel" and not result["ETA Vessel at POD"]:
                 result["ETA Vessel at POD"] = date
 
-            # Feeder name
-            if vessel and "med" in vessel.lower():
+            if "med" in vessel.lower() and not result["Feeder name"]:
                 result["Feeder name"] = vessel
 
         return result
