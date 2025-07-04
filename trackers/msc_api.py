@@ -1,42 +1,46 @@
-from flask import Flask, request, jsonify
-import asyncio
-import nest_asyncio
-from trackers import track_msc  # bu dəyişdi
+import aiohttp
+import json
 
-nest_asyncio.apply()
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return 'MSC Container Tracking API is running.'
-
-@app.route('/track', methods=['POST'])
-def track():
+async def track_msc(bl_number):
     try:
-        data = request.json
-        bl_number = data.get('bl_number', '').strip()
-        shipping_line = data.get('shipping_line', '').lower().strip()
-
-        print("📦 Received data:", data)
-
-        result = {
-            "etd_pol": "Yoxdur",
-            "eta_transshipment": "Yoxdur",
-            "etd_transshipment": "Yoxdur",
-            "feeder": "Yoxdur",
-            "eta_pod": "Yoxdur"
+        url = "https://www.msc.com/api/feature/tools/TrackingInfo"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Content-Type": "application/json",
+            "Origin": "https://www.msc.com",
+            "Referer": "https://www.msc.com/",
         }
 
-        if shipping_line == "msc":
-            loop = asyncio.get_event_loop()
-            msc_data = loop.run_until_complete(track_msc(bl_number))
-            if msc_data.get("success"):
-                result.update(msc_data)
-            else:
-                return jsonify({"error": msc_data.get("error", "Unknown error")})
+        payload = {
+            "SearchBy": "BOL",
+            "Number": bl_number
+        }
 
-        return jsonify(result)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status != 200:
+                    return {"success": False, "error": f"HTTP {resp.status} error"}
+                
+                data = await resp.json()
+
+                containers = data.get("Containers", [])
+                if not containers:
+                    return {"success": False, "error": "No container data found."}
+
+                events = containers[0].get("Events", [])
+
+                etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
+                eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
+                feeder = next((e["VesselName"] for e in events if e.get("VesselName")), "")
+
+                return {
+                    "success": True,
+                    "etd_pol": etd_pol,
+                    "eta_pod": eta_pod,
+                    "feeder": feeder,
+                    "eta_transshipment": "",
+                    "etd_transshipment": ""
+                }
 
     except Exception as e:
-        print("🔥 General error:", str(e))
-        return jsonify({"error": str(e)})
+        return {"success": False, "error": str(e)}
