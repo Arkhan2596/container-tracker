@@ -3,5 +3,5 @@ requests
 beautifulsoup4
 lxml
 gunicorn
-flask
 playwright
+nest_asyncio
