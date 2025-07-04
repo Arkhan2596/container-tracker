@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from trackers import msc  # <- Yəni, msc.py faylı `trackers` qovluğundadır
+from trackers import msc  # msc.py faylı `trackers/` qovluğundadır
 
 app = Flask(__name__)
 
@@ -26,6 +26,10 @@ def track():
 
         if shipping_line == "msc":
             msc_result = msc.track(container_number, bl_number)
+
+            # 🔍 Debug üçün nəticəni loga ver:
+            print("MSC result:", msc_result)
+
             for key in result:
                 if key in msc_result and msc_result[key]:
                     result[key] = msc_result[key]
