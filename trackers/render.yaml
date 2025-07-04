@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: container-tracker
+    env: python
+    buildCommand: bash build.sh
+    startCommand: ""
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10
