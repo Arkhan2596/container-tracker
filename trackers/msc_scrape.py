@@ -15,6 +15,8 @@ def track_msc(bl_number):
 
             page.wait_for_selector('.shipment-events', timeout=15000)
             html_content = page.inner_html('.shipment-events')
+            print("🔍 HTML content from MSC:")
+            print(html_content)  # <-- Bunu log üçün əlavə etdik
 
             browser.close()
             return {
