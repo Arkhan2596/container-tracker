@@ -3,5 +3,4 @@ requests
 beautifulsoup4
 lxml
 gunicorn
-playwright
 nest_asyncio
