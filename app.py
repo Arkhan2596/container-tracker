@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
 import asyncio
 import nest_asyncio
-from trackers import msc_scrape  # msc_scrape.track_msc async funksiyadır
+from trackers import msc_scrape  # <- Async funksiya
 
-# Nest asyncio event loop problemi üçün
+# Nest asyncio: Gunicorn ilə async loop problemi olmur
 nest_asyncio.apply()
 
 app = Flask(__name__)
@@ -32,10 +32,9 @@ def track():
         }
 
         if shipping_line == "msc":
-            # async function icra edilir
-            msc_result = asyncio.get_event_loop().run_until_complete(
-                msc_scrape.track_msc(bl_number)
-            )
+            # async funksiyanı sync kontekstdə işlət
+            loop = asyncio.get_event_loop()
+            msc_result = loop.run_until_complete(msc_scrape.track_msc(bl_number))
             print("🔧 MSC scrape result:", msc_result)
             result["raw_result"] = msc_result
 
@@ -44,7 +43,3 @@ def track():
     except Exception as e:
         print("🔥 General error:", str(e))
         return jsonify({"error": str(e)})
-
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=10000)
