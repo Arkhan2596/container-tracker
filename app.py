@@ -23,6 +23,8 @@ def track():
     try:
         if shipping_line == "msc":
             result = msc.track_msc(container_number, bl_number)
+            print("MSC nəticəsi:", result)      
+
     except Exception as e:
         result["status"] = f"Error: {str(e)}"
 
