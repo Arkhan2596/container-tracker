@@ -3,7 +3,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 app = Flask(__name__)
 
-def get_searates_tracking(container_number: str):
+def get_searates_tracking(container_number: str, sealine: str = None):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True,
             args=[
@@ -14,6 +14,8 @@ def get_searates_tracking(container_number: str):
             ])
         page = browser.new_page()
         url = f"https://www.searates.com/container/tracking/?number={container_number}&type=CT"
+        if sealine:
+            url += f"&sealine={sealine}"
         page.goto(url)
         try:
             page.wait_for_selector('div.tracking-info', timeout=15000)
@@ -30,8 +32,9 @@ def track():
     container = request.args.get('container')
     if not container:
         return jsonify({'error': 'container param is required'}), 400
+    sealine = request.args.get('sealine')
 
-    data = get_searates_tracking(container.strip())
+    data = get_searates_tracking(container.strip(), sealine.strip() if sealine else None)
     if not data or 'containerTracking' not in data:
         return jsonify({'error': 'No tracking data found'}), 404
 
@@ -43,6 +46,7 @@ def track():
 
     return jsonify({
         'container': container,
+        'sealine': sealine,
         'events': events,
         'vessel': vessel,
         'destination': destination
