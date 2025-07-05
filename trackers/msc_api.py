@@ -1,39 +1,47 @@
-# trackers/msc_api.py
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from lxml import html
-import time
+# === trackers/msc_api.py ===
+import requests
 
 def track_msc(bl_number: str) -> dict:
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
-
-    driver = webdriver.Chrome(options=options)
+    url = "https://www.msc.com/api/feature/tools/TrackingInfo"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Content-Type": "application/json",
+        "Origin": "https://www.msc.com",
+        "Referer": "https://www.msc.com/"
+    }
+    payload = {
+        "SearchBy": "B",  # BL number
+        "Numbers": [bl_number.strip()]
+    }
 
     try:
-        driver.get("https://www.msc.com/track-a-shipment")
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        if response.status_code != 200:
+            return {
+                "success": False,
+                "error": f"HTTP {response.status_code} error",
+                "response_text": response.text
+            }
 
-        input_box = driver.find_element("id", "trackingNumber")
-        input_box.clear()
-        input_box.send_keys(bl_number)
+        data = response.json()
+        containers = data.get("Containers", [])
+        if not containers:
+            return {"success": False, "error": "No container data found."}
 
-        button = driver.find_element("xpath", '//button[contains(text(), "Track")]')
-        button.click()
+        events = containers[0].get("Events", [])
 
-        time.sleep(10)
-
-        tree = html.fromstring(driver.page_source)
-        shipment_info = tree.xpath('//div[contains(@class,"shipment-container")]//text()')
+        etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
+        eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
+        feeder  = next((e.get("VesselName", "") for e in events if e.get("VesselName")), "")
 
         return {
             "success": True,
-            "result": ''.join(shipment_info)[:500]
+            "etd_pol": etd_pol,
+            "eta_transshipment": "",
+            "etd_transshipment": "",
+            "feeder": feeder,
+            "eta_pod": eta_pod
         }
 
     except Exception as e:
         return {"success": False, "error": str(e)}
-    finally:
-        driver.quit()
