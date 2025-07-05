@@ -1,48 +1,48 @@
 from flask import Flask, request, jsonify
-import asyncio
-import nest_asyncio
-from trackers import msc_api  # ✅ msc_scrape yox, artıq msc_api
+import requests
+import json
 
-nest_asyncio.apply()
 app = Flask(__name__)
 
-@app.route('/')
-def index():
-    return 'MSC Container Tracking API is running.'
+def track_msc_api(bl_number):
+    url = "https://www.msc.com/api/feature/tools/TrackingInfo"
+    headers = {
+        "Content-Type": "application/json",
+        "Referer": "https://www.msc.com/track-a-shipment",
+        "Origin": "https://www.msc.com",
+        "User-Agent": "Mozilla/5.0"
+    }
+    payload = {
+        "SearchBy": "B",  # B for BL, C for Container
+        "Numbers": [bl_number]
+    }
 
-@app.route('/track', methods=['POST'])
-def track():
+    response = requests.post(url, json=payload, headers=headers)
     try:
-        data = request.json
-        bl_number = data.get('bl_number', '').strip()
-        shipping_line = data.get('shipping_line', '').lower().strip()
-
-        print("📦 Received data:", data)
-
-        result = {
-            "etd_pol": "No result found",
-            "eta_transshipment": "No result found",
-            "etd_transshipment": "No result found",
-            "feeder": "No result found",
-            "eta_pod": "No result found"
+        data = response.json()
+        # 🔵 Burda Render loglarında görə bilmək üçün print edirik
+        print("🔎 MSC raw result:")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        return data
+    except Exception as e:
+        return {
+            "error": "JSON parse error",
+            "details": str(e),
+            "raw": response.text
         }
 
-        if shipping_line == "msc":
-            loop = asyncio.get_event_loop()
-            msc_data = loop.run_until_complete(msc_api.track_msc(bl_number))  # ✅ dəyişdirildi
-            if msc_data.get("success"):
-                result.update({
-                    "etd_pol": msc_data.get("etd_pol", ""),
-                    "eta_transshipment": msc_data.get("eta_transshipment", ""),
-                    "etd_transshipment": msc_data.get("etd_transshipment", ""),
-                    "feeder": msc_data.get("feeder", ""),
-                    "eta_pod": msc_data.get("eta_pod", "")
-                })
-            else:
-                return jsonify({"error": msc_data.get("error", "Unknown error")})
+@app.route("/track", methods=["POST"])
+def track():
+    try:
+        data = request.get_json()
+        bl_number = data.get("bl_number", "").strip()
+
+        if not bl_number:
+            return jsonify({"error": "BL number is required"}), 400
+
+        result = track_msc_api(bl_number)
 
         return jsonify(result)
 
     except Exception as e:
-        print("🔥 General error:", str(e))
-        return jsonify({"error": str(e)})
+        return jsonify({"error": "Server error", "details": str(e)}), 500
