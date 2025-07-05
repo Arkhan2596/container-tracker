@@ -1,8 +1,7 @@
-# trackers/msc_api.py
-import aiohttp
-import asyncio
+import requests
+from lxml import html
 
-async def track_msc(bl_number: str) -> dict:
+def track_msc(bl_number: str) -> dict:
     url = "https://www.msc.com/api/feature/tools/TrackingInfo"
     headers = {
         "User-Agent": "Mozilla/5.0",
@@ -11,31 +10,35 @@ async def track_msc(bl_number: str) -> dict:
         "Referer": "https://www.msc.com/",
     }
     payload = {
-        "SearchBy": "B",  # BL number
+        "SearchBy": "B",         # "B" = BL number, "C" = Container no.
         "Numbers": [bl_number]
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload, headers=headers) as resp:
-            if resp.status != 200:
-                return {"success": False, "error": f"HTTP {resp.status} error"}
-            data = await resp.json()
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        if response.status_code != 200:
+            return {"success": False, "error": f"HTTP {response.status_code} error"}
 
-    # Əsas məlumatları çıxar
-    containers = data.get("Containers", [])
-    if not containers:
-        return {"success": False, "error": "No container data found."}
+        data = response.json()
 
-    events = containers[0].get("Events", [])
-    etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
-    eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
-    feeder  = next((e.get("VesselName", "") for e in events), "")
+        # Əgər cavab boşdursa
+        containers = data.get("Containers", [])
+        if not containers:
+            return {"success": False, "error": "No container data found."}
 
-    return {
-        "success": True,
-        "etd_pol": etd_pol,
-        "eta_transshipment": "",
-        "etd_transshipment": "",
-        "feeder": feeder,
-        "eta_pod": eta_pod
-    }
+        events = containers[0].get("Events", [])
+        etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
+        eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
+        feeder = next((e.get("VesselName", "") for e in events if e.get("VesselName")), "")
+
+        return {
+            "success": True,
+            "etd_pol": etd_pol,
+            "eta_transshipment": "",
+            "etd_transshipment": "",
+            "feeder": feeder,
+            "eta_pod": eta_pod
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
