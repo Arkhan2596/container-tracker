@@ -9,18 +9,21 @@ async def track_msc(bl_number):
 
             await page.goto("https://www.msc.com/track-a-shipment", timeout=60000)
 
-            # Düzəliş buradadır:
             await page.locator("#trackingNumber").fill(bl_number)
             await page.get_by_role("button", name="Track").click()
 
+            # Sadəcə əsas selectoru yoxla, məsələn, nəticə qutusu
             await page.wait_for_selector(".shipment-container", timeout=20000)
 
-            content = await page.content()
+            # Ən əsas: JSON şəklində lazım olan məlumatı çıxarmağa çalış
+            # Sadəcə səhifədəki bəzi mətnləri götürək misal üçün
+            result_text = await page.locator(".shipment-container").inner_text()
+
             await browser.close()
 
             return {
                 "success": True,
-                "html": content[:1000]
+                "result": result_text[:1000]  # İlk 1000 simvolu qaytarırıq
             }
 
     except Exception as e:
