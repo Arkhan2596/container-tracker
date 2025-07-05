@@ -1,5 +1,4 @@
-flask
+Flask
+requests
+lxml
 gunicorn
-aiohttp
-nest_asyncio
-playwright
