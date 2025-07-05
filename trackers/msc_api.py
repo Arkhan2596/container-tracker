@@ -1,60 +1,45 @@
-# === trackers/msc_api.py ===
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from lxml import html
+import time
 
-def track_msc(bl_number: str) -> dict:
-    url = "https://www.msc.com/api/feature/tools/TrackingInfo"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        "Content-Type": "application/json",
-        "Origin": "https://www.msc.com",
-        "Referer": "https://www.msc.com/track-a-shipment",
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Dest": "empty"
-    }
-    payload = {
-        "SearchBy": "B",  # "B" = BL number, "C" = container number
-        "Numbers": [bl_number.strip()]
-    }
+def track_msc_selenium(bl_number):
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
 
+    driver = webdriver.Chrome(options=options)
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        driver.get("https://www.msc.com/track-a-shipment")
 
-        if response.status_code == 403:
-            # 403 olduqda daha detallı cavabı loglamaq üçün
-            return {
-                "success": False,
-                "error": "HTTP 403 Forbidden error from MSC API",
-                "response_text": response.text[:1000]  # cavabın ilk 1000 simvolu
-            }
+        # BL nömrəsini inputa yaz
+        input_box = driver.find_element("id", "trackingNumber")
+        input_box.clear()
+        input_box.send_keys(bl_number)
 
-        if response.status_code != 200:
-            return {"success": False, "error": f"HTTP {response.status_code} error"}
+        # Track düyməsini kliklə
+        button = driver.find_element("xpath", '//button[contains(text(), "Track")]')
+        button.click()
 
-        data = response.json()
+        # Gözlə nəticə gələnə qədər (sadə, 10 saniyə)
+        time.sleep(10)
 
-        containers = data.get("Containers", [])
-        if not containers:
-            return {"success": False, "error": "No container data found."}
+        page_source = driver.page_source
 
-        events = containers[0].get("Events", [])
+        # HTML-i lxml ilə analiz elə
+        tree = html.fromstring(page_source)
 
-        etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
-        eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
-        feeder = next((e.get("VesselName", "") for e in events if e.get("VesselName")), "")
+        # Məsələn, bir nümunə element seçək
+        shipment_info = tree.xpath('//div[contains(@class,"shipment-container")]//text()')
 
+        # İlk 500 simvolu qaytar
         return {
             "success": True,
-            "etd_pol": etd_pol,
-            "eta_transshipment": "",
-            "etd_transshipment": "",
-            "feeder": feeder,
-            "eta_pod": eta_pod
+            "result": ''.join(shipment_info)[:500]
         }
 
     except Exception as e:
-        return {"success": False, "error": f"Exception: {str(e)}"}
+        return {"success": False, "error": str(e)}
+    finally:
+        driver.quit()
