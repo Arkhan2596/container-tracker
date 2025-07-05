@@ -1,23 +1,52 @@
 from flask import Flask, request, jsonify
-from trackers import msc_api
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 app = Flask(__name__)
 
-@app.route("/debug", methods=["POST"])
-def debug():
-    data = request.get_json()
-    print("📦 Received:", data)
-    return jsonify({"received": data, "success": True})
+def get_searates_tracking(container_number: str):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+            ])
+        page = browser.new_page()
+        url = f"https://www.searates.com/container/tracking/?number={container_number}&type=CT"
+        page.goto(url)
+        try:
+            page.wait_for_selector('div.tracking-info', timeout=15000)
+        except PlaywrightTimeoutError:
+            browser.close()
+            return None
 
-@app.route("/track", methods=["POST"])
+        data = page.evaluate('() => window.__INITIAL_STATE__')
+        browser.close()
+        return data
+
+@app.route('/track', methods=['GET'])
 def track():
-    data = request.get_json()
-    bl_number = data.get("bl_number", "").strip()
+    container = request.args.get('container')
+    if not container:
+        return jsonify({'error': 'container param is required'}), 400
 
-    print("🔍 Tracking BL:", bl_number)
+    data = get_searates_tracking(container.strip())
+    if not data or 'containerTracking' not in data:
+        return jsonify({'error': 'No tracking data found'}), 404
 
-    if not bl_number:
-        return jsonify({"success": False, "error": "Missing BL number"}), 400
+    tracking_info = data['containerTracking'].get('trackingInfo', {})
 
-    result = msc_api.track_msc(bl_number)
-    return jsonify(result)
+    events = tracking_info.get('events', [])
+    vessel = tracking_info.get('vesselName', '')
+    destination = tracking_info.get('destination', '')
+
+    return jsonify({
+        'container': container,
+        'events': events,
+        'vessel': vessel,
+        'destination': destination
+    })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
