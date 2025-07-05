@@ -1,30 +1,41 @@
-from playwright.async_api import async_playwright
+# trackers/msc_api.py
+import aiohttp
+import asyncio
 
-async def track_msc(bl_number):
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context()
-            page = await context.new_page()
+async def track_msc(bl_number: str) -> dict:
+    url = "https://www.msc.com/api/feature/tools/TrackingInfo"
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Content-Type": "application/json",
+        "Origin": "https://www.msc.com",
+        "Referer": "https://www.msc.com/",
+    }
+    payload = {
+        "SearchBy": "B",  # BL number
+        "Numbers": [bl_number]
+    }
 
-            await page.goto("https://www.msc.com/track-a-shipment", timeout=60000)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, headers=headers) as resp:
+            if resp.status != 200:
+                return {"success": False, "error": f"HTTP {resp.status} error"}
+            data = await resp.json()
 
-            await page.locator("#trackingNumber").fill(bl_number)
-            await page.get_by_role("button", name="Track").click()
+    # Əsas məlumatları çıxar
+    containers = data.get("Containers", [])
+    if not containers:
+        return {"success": False, "error": "No container data found."}
 
-            # Sadəcə əsas selectoru yoxla, məsələn, nəticə qutusu
-            await page.wait_for_selector(".shipment-container", timeout=20000)
+    events = containers[0].get("Events", [])
+    etd_pol = next((e["EventDate"] for e in events if e["EventName"] == "Export Loaded"), "")
+    eta_pod = next((e["EventDate"] for e in events if "Discharged" in e["EventName"]), "")
+    feeder  = next((e.get("VesselName", "") for e in events), "")
 
-            # Ən əsas: JSON şəklində lazım olan məlumatı çıxarmağa çalış
-            # Sadəcə səhifədəki bəzi mətnləri götürək misal üçün
-            result_text = await page.locator(".shipment-container").inner_text()
-
-            await browser.close()
-
-            return {
-                "success": True,
-                "result": result_text[:1000]  # İlk 1000 simvolu qaytarırıq
-            }
-
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    return {
+        "success": True,
+        "etd_pol": etd_pol,
+        "eta_transshipment": "",
+        "etd_transshipment": "",
+        "feeder": feeder,
+        "eta_pod": eta_pod
+    }
