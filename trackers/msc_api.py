@@ -3,7 +3,7 @@ from selenium.webdriver.chrome.options import Options
 from lxml import html
 import time
 
-def track_msc_selenium(bl_number):
+def track_msc(bl_number):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
