@@ -4,13 +4,17 @@ import requests
 def track_msc(bl_number: str) -> dict:
     url = "https://www.msc.com/api/feature/tools/TrackingInfo"
     headers = {
-        # Daha tam və real bir User-Agent istifadə edirik
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/115.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
         "Content-Type": "application/json",
         "Origin": "https://www.msc.com",
-        "Referer": "https://www.msc.com/"
+        "Referer": "https://www.msc.com/track-a-shipment",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Dest": "empty"
     }
     payload = {
         "SearchBy": "B",  # "B" = BL number, "C" = container number
